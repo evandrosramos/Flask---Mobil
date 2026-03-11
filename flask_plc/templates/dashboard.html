@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TL14 Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #2d3748; }
+
+        .page-wrap { max-width: 1240px; margin: 0 auto; padding: 0 24px 48px; }
+        .secao { padding: 18px 0 6px; }
+        .secao-titulo {
+            font-size: .75rem; font-weight: 700; text-transform: uppercase;
+            color: #718096; border-left: 4px solid #63b3ed;
+            padding-left: 10px; margin-bottom: 12px; letter-spacing: .5px;
+        }
+
+        /* ── CABEÇALHO ── */
+        .header {
+            background: #fff; border-bottom: 3px solid #bee3f8;
+            padding: 13px 24px; display: flex; align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(0,0,0,.07);
+            position: sticky; top: 0; z-index: 99;
+        }
+        .header h1 { font-size: 1.25rem; color: #2b6cb0; }
+        .header-sub { font-size: .7rem; color: #a0aec0; margin-top: 2px; }
+        .header-right { display: flex; align-items: center; gap: 14px; }
+        .meta { font-size: .75rem; color: #718096; text-align: right; line-height: 1.5; }
+        .comm-group { display: flex; gap: 8px; }
+        .comm-badge {
+            display: flex; align-items: center; gap: 5px;
+            font-size: .73rem; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+            background: #e2e8f0; color: #718096; transition: background .4s, color .4s;
+        }
+        .comm-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #a0aec0; flex-shrink: 0; }
+        .comm-badge.ok  { background: #c6f6d5; color: #276749; }
+        .comm-badge.ok  .dot { background: #38a169; animation: pisca 1.4s infinite; }
+        .comm-badge.off { background: #e2e8f0; color: #a0aec0; }
+        .comm-badge.off .dot { background: #cbd5e0; }
+        @keyframes pisca { 0%,100%{opacity:1} 50%{opacity:.15} }
+
+        /* Animação para Missão Executando */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .4; }
+        }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+        /* ── BADGES ── */
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .73rem; font-weight: 700; transition: all 0.3s ease; }
+        .badge.lg { padding: 5px 14px; font-size: .85rem; }
+        .bg-green  { background:#c6f6d5; color:#276749; }
+        .bg-red    { background:#fed7d7; color:#c53030; }
+        .bg-yellow { background:#fefcbf; color:#744210; }
+        .bg-blue   { background:#bee3f8; color:#2b6cb0; }
+        .bg-gray   { background:#e2e8f0; color:#4a5568; }
+        .bg-purple { background:#e9d8fd; color:#553c9a; }
+
+        /* ── STATUS GERAL ── */
+        .grid-status { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .card-s {
+            background: #fff; border-radius: 10px;
+            padding: 13px 12px; text-align: center;
+            border-top: 4px solid #63b3ed;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .cl { font-size: .65rem; text-transform: uppercase; color: #a0aec0; margin-bottom: 7px; letter-spacing: .4px; }
+        .cv { font-size: 1.3rem; font-weight: 700; color: #2b6cb0; }
+
+        /* ── MISSÃO ATUAL ── */
+        .card-missao {
+            background: #fff;
+            border-radius: 12px;
+            border-left: 6px solid #805ad5;
+            padding: 16px 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,.07);
+
+            /* proporção 75% campos / 25% gauge usando fr para evitar quebra com os gaps */
+            display: grid;
+            grid-template-columns: 3fr 1fr; 
+            align-items: center;
+            column-gap: 8px;
+            min-height: 150px;
+        }
+
+        .card-missao-fields {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            align-items: center;
+            gap: 16px;
+            padding-right: 10px;
+        }
+
+        .card-missao-gauge {
+            width: 100%;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            border-left: 1px solid #edf2f7;
+            padding-left: 10px;
+        }
+
+        .cm-campo {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Alinha o título e o valor à esquerda da sua própria coluna */
+            justify-content: center;
+            gap: 6px; /* Espaço sutil entre o título e o valor */
+        }
+
+        .cm-tit {
+            font-size: .64rem;
+            text-transform: uppercase;
+            color: #a0aec0;
+            letter-spacing: .8px; /* Aumentado levemente para ficar igual à imagem */
+            white-space: nowrap;
+            font-weight: 600;
+        }
+
+        .cm-val {
+            font-size: 1.05rem; /* Um pouco maior para destacar */
+            font-weight: 700;
+            color: #2d3748;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+
+        .b-origem,
+        .b-destino {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: fit-content;
+            max-width: 100%;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: .92rem;
+            font-weight: 700;
+            line-height: 1.15;
+            white-space: nowrap;
+        }
+
+        .b-origem  { background:#f0fff4; color:#276749; }
+        .b-destino { background:#ebf8ff; color:#2b6cb0; }
+
+        /* ── GAUGE CSS (conic-gradient) ── */
+        .gauge-ring {
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            transition: background .5s ease;
+            box-shadow: rgba(6,24,44,.1) 0 0 0 2px, rgba(6,24,44,.15) 0 3px 8px -2px;
+        }
+        .gauge-hole {
+            background: #fff; border-radius: 50%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+        }
+
+        /* Gauge missão */
+        .gm-outer {
+            position: relative;
+            width: 124px;
+            height: 124px;
+            display: inline-block;
+        }
+        .gm-ring { width: 124px; height: 124px; }
+        .gm-hole { width: 72%; height: 72%; }
+
+        .gm-val { font-size: 1.25rem; font-weight: 700; line-height: 1; }
+        .gm-sub { font-size: .58rem; color: #a0aec0; margin-top: 2px; }
+
+        /* Pivot (girador invisível) */
+        .gm-avg-pivot {
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            transform-origin: center center; 
+            pointer-events: none;
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start;
+            transition: transform .6s ease;
+        }
+
+        /* O traço marcador (Tick) contido na espessura do anel */
+        .gm-avg-needle {
+            width: 5px;             /* Mais largo para destaque */
+            height: 14px;           /* Altura correspondente à espessura do seu anel colorido */
+            background: #2d3748;    /* Cor escura forte */
+            border-radius: 3px;     /* Bordas levemente arredondadas */
+            margin-top: 2px;        /* Afasta do limite externo para ficar centralizado na borda */
+            box-shadow: 0 0 0px rgba(255,255,255,0.8); /* Leve brilho atrás para não sumir no colorido */
+            z-index: 10;
+        }
+
+        /* Gauges OEE */
+        .go-ring { width: 110px; height: 110px; margin: 6px auto 2px; }
+        .go-hole { width: 74%; height: 74%; }
+        .go-val  { font-size: 1.1rem; font-weight: 700; line-height: 1; }
+        .go-sub  { font-size: .58rem; color: #a0aec0; margin-top: 2px; }
+
+        /* ── OEE + KPIs ── */
+        .oee-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+        .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        .card-oee {
+            background: #fff; border-radius: 10px;
+            padding: 13px 10px 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06); text-align: center;
+        }
+        .card-oee-global { border: 2px solid #e9d8fd; }
+        .oee-global-num { font-size: 2.8rem; font-weight: 700; color: #805ad5; line-height: 1; }
+        .oee-global-eq  { font-size: .68rem; color: #a0aec0; margin-top: 4px; }
+        .card-kpi {
+            background: #fff; border-radius: 10px; padding: 13px 12px; text-align: center;
+            border-top: 4px solid #63b3ed; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        }
+        .kpi-num { font-size: 2.2rem; font-weight: 700; }
+
+        /* ── GRÁFICOS ── */
+        .graficos-row { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: stretch; }
+        .card-tempo-medio {
+            background: #fff; border-radius: 10px; padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06); text-align: center;
+            border-left: 4px solid #63b3ed;
+            display: flex; flex-direction: column; justify-content: center;
+        }
+        .tempo-medio-num { font-size: 2.4rem; font-weight: 700; color: #2b6cb0; margin-top: 6px; }
+        .chart-card { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .chart-canvas-wrap { position: relative; height: 180px; }
+
+        /* ── HISTÓRICO ── */
+        .tabela-wrap { background: #fff; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.06); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; font-size: .82rem; text-align: center; }
+        thead { background: #ebf8ff; }
+        thead th { padding: 10px 12px; color: #2b6cb0; font-weight: 700; border-bottom: 2px solid #bee3f8; }
+        tbody td { padding: 8px 12px; color: #4a5568; border-bottom: 1px solid #e2e8f0; }
+        .td-left { text-align: left; font-weight: 600; color: #2d3748; }
+        tbody tr.tipo-entrada { background: #f0fff4; }
+        tbody tr.tipo-saida   { background: #ebf8ff; }
+        tbody tr:hover { filter: brightness(.97); }
+        .paginacao {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 9px 14px; border-bottom: 1px solid #e2e8f0; font-size: .8rem; color: #4a5568;
+        }
+        .paginacao button {
+            padding: 4px 12px; border-radius: 6px; border: 1px solid #cbd5e0;
+            background: #edf2f7; cursor: pointer; font-size: .78rem; color: #2d3748;
+        }
+        .paginacao button:disabled { opacity: .38; cursor: default; }
+
+        /* Responsivo */
+        @media (max-width: 1100px) {
+            .card-missao {
+                grid-template-columns: 1fr;
+                row-gap: 14px;
+            }
+            .card-missao-fields {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+            .card-missao-gauge {
+                border-left: 0;
+                border-top: 1px solid #edf2f7;
+                padding-left: 0;
+                padding-top: 12px;
+            }
+        }
+        @media (max-width: 700px) {
+            .card-missao-fields {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══ SEÇÃO 1: CABEÇALHO ══ -->
+<div class="header">
+    <div>
+        <h1>Mobil</h1>
+        <div class="header-sub">A1: Lógica / Missão &nbsp;|&nbsp; A2: Status / Posição / Missão Atual</div>
+    </div>
+    <div class="header-right">
+        <div class="comm-group">
+            <div class="comm-badge off" id="badge-a1"><span class="dot"></span>A1 &nbsp;192.168.100.1</div>
+            <div class="comm-badge off" id="badge-a2"><span class="dot"></span>A2 &nbsp;192.168.100.12</div>
+        </div>
+        <div class="meta">Atualizado<br><strong id="horario">--:--:--</strong></div>
+    </div>
+</div>
+
+<div class="page-wrap">
+
+    <!-- ══ SEÇÃO 2: STATUS GERAL ══ -->
+    <div class="secao">
+        <div class="secao-titulo">Status da Máquina</div>
+        <div class="grid-status">
+            <div class="card-s" style="border-top-color:#63b3ed">
+                <div class="cl">Modo Operação</div>
+                <div class="cv"><span class="badge lg bg-gray" id="modo-badge">--</span></div>
+            </div>
+            <div class="card-s" style="border-top-color:#68d391">
+                <div class="cl">Saúde</div>
+                <div class="cv"><span class="badge lg bg-gray" id="alarme-badge">--</span></div>
+            </div>
+            <div class="card-s" style="border-top-color:#f6ad55">
+                <div class="cl">Coluna</div>
+                <div class="cv" id="pos-coluna" style="font-size:1.8rem">—</div>
+            </div>
+            <div class="card-s" style="border-top-color:#b794f4">
+                <div class="cl">Andar</div>
+                <div class="cv" id="pos-andar" style="font-size:1.8rem">—</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SEÇÃO 3: MISSÃO EM EXECUÇÃO ══ -->
+        <div class="secao">
+        <div class="secao-titulo">Missão em Execução</div>
+
+        <div class="card-missao">
+            <div class="card-missao-fields">
+                <div class="cm-campo">
+                    <span class="cm-tit">Status</span>
+                    <span id="m-status" class="badge bg-gray">Parado</span>
+                </div>
+
+                <div class="cm-campo">
+                    <span class="cm-tit">Tipo de Missão</span>
+                    <span class="cm-val" id="m-tipo">-</span>
+                </div>
+
+                <div class="cm-campo">
+                    <span class="cm-tit">Início</span>
+                    <span class="cm-val" id="m-inicio" style="font-size:.88rem;color:#718096">-</span>
+                </div>
+
+                <div class="cm-campo">
+                    <span class="cm-tit">Origem</span>
+                    <span id="m-origem" class="b-origem">-</span>
+                </div>
+
+                <div class="cm-campo">
+                    <span class="cm-tit">Destino</span>
+                    <span id="m-destino" class="b-destino">-</span>
+                </div>
+            </div>
+
+            <div class="card-missao-gauge">
+                <div class="gm-outer">
+                    <div class="gauge-ring gm-ring" id="gaugeMissaoRing"
+                        style="background:conic-gradient(#edf2f7 360deg,#edf2f7 0deg)">
+                        <div class="gauge-hole gm-hole">
+                            <span class="gm-val" id="m-duracao-label" style="color:#d69e2e">0s</span>
+                            <span class="gm-sub">/ 150</span>
+                        </div>
+                    </div>
+
+                    <div class="gm-avg-pivot" id="gm-avg-pivot" style="display:none">
+                        <div class="gm-avg-needle"></div>
+                    </div>
+                </div>
+
+                <span style="font-size:.62rem;color:#a0aec0">Duração — ref. 150s</span>
+                <span id="gm-avg-label" style="font-size:.68rem;color:#718096;font-weight:600;display:none"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SEÇÃO 4: OEE + KPIs ══ -->
+    <div class="secao">
+        <div class="secao-titulo" id="oee-titulo">OEE — última hora &nbsp;|&nbsp; KPIs de Produção</div>
+        <div class="oee-row">
+            <div class="card-oee">
+                <div class="cl">Disponibilidade</div>
+                <div class="gauge-ring go-ring" id="gaugeDispRing"
+                     style="background:conic-gradient(#38a169 0deg,#edf2f7 0deg)">
+                    <div class="gauge-hole go-hole">
+                        <span class="go-val" id="val-disp" style="color:#38a169">0%</span>
+                        <span class="go-sub">D</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-oee">
+                <div class="cl">Performance</div>
+                <div class="gauge-ring go-ring" id="gaugePerfRing"
+                     style="background:conic-gradient(#3182ce 0deg,#edf2f7 0deg)">
+                    <div class="gauge-hole go-hole">
+                        <span class="go-val" id="val-perf" style="color:#3182ce">0%</span>
+                        <span class="go-sub">P</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-oee">
+                <div class="cl">Qualidade</div>
+                <div class="gauge-ring go-ring" id="gaugeQualRing"
+                     style="background:conic-gradient(#dd6b20 0deg,#edf2f7 0deg)">
+                    <div class="gauge-hole go-hole">
+                        <span class="go-val" id="val-qual" style="color:#dd6b20">0%</span>
+                        <span class="go-sub">Q</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-oee card-oee-global">
+                <div class="cl">OEE Global</div>
+                <div style="height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                    <div class="oee-global-num" id="val-oee">0%</div>
+                    <div class="oee-global-eq">D × P × Q</div>
+                </div>
+            </div>
+        </div>
+        <div class="kpi-row">
+            <div class="card-kpi" style="border-top-color:#3182ce">
+                <div class="cl">Total de Missões</div>
+                <div class="kpi-num" id="cc-total" style="color:#3182ce">0</div>
+            </div>
+            <div class="card-kpi" style="border-top-color:#38a169">
+                <div class="cl">Entradas (Carregamentos)</div>
+                <div class="kpi-num" id="cc-ent" style="color:#38a169">0</div>
+            </div>
+            <div class="card-kpi" style="border-top-color:#dd6b20">
+                <div class="cl">Saídas (Descarregamentos)</div>
+                <div class="kpi-num" id="cc-sai" style="color:#dd6b20">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SEÇÃO 5: GRÁFICOS ══ -->
+    <div class="secao">
+        <div class="secao-titulo">Desempenho</div>
+        <div class="graficos-row">
+            <div class="card-tempo-medio">
+                <div class="cl">Tempo Médio de Missão</div>
+                <div class="tempo-medio-num" id="t-medio">—</div>
+            </div>
+            <div class="chart-card">
+                <div class="cl" style="margin-bottom:8px">Duração das Missões (página atual)</div>
+                <div class="chart-canvas-wrap">
+                    <div class="chart-canvas-wrap">
+                        <canvas id="graficoDuracao"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ SEÇÃO 6: HISTÓRICO PAGINADO ══ -->
+    <div class="secao">
+        <div class="secao-titulo">Histórico de Missões</div>
+        <div class="tabela-wrap">
+            <div class="paginacao">
+                <button id="btn-prev" onclick="mudarPagina(-1)" disabled>← Anterior</button>
+                <span id="info-pagina">Página 1 de 1 | 0 missões no total</span>
+                <button id="btn-next" onclick="mudarPagina(1)" disabled>Próxima →</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fim</th><th>Tipo</th><th>Origem</th>
+                        <th>Destino</th><th>Duração (s)</th><th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="missoes-body">
+                    <tr><td colspan="6" style="padding:18px;color:#a0aec0">Carregando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ─── Estado ──────────────────────────────────────────────────────────
+let timerAndamento = null;
+let segundosDecorridos = 0;
+let chartDuracao = null;
+let currentPage = 1;
+let totalPages  = 1;
+let avgMissaoSeg = 0;
+const MAX_MISSAO_SEG = 150;
+
+// ─── Gauge CSS: conic-gradient puro ─────────────────────────────────
+function setGauge(id, pct, color) {
+    const deg = Math.max(0, Math.min(100, pct)) * 3.6;
+    document.getElementById(id).style.background =
+        `conic-gradient(${color} ${deg}deg, #edf2f7 0deg)`;
+}
+
+function setGaugeMissao(seg) {
+    const pct  = Math.min(100, (seg / MAX_MISSAO_SEG) * 100);
+    const cDeg = pct * 3.6;
+    const cor  = cDeg > 259 ? '#e53e3e' : cDeg > 216 ? '#dd6b20' : '#d69e2e';
+
+    document.getElementById('m-duracao-label').style.color = cor;
+
+    // Marcador de média
+    const avgPct  = avgMissaoSeg > 0 ? Math.min(100, (avgMissaoSeg / MAX_MISSAO_SEG) * 100) : -1;
+    const aDeg    = avgPct >= 0 ? avgPct * 3.6 : -1;
+    const pivot   = document.getElementById('gm-avg-pivot');
+    const avgLbl  = document.getElementById('gm-avg-label');
+
+    if (aDeg >= 0) {
+        pivot.style.display   = 'flex';
+        pivot.style.transform = `rotate(${aDeg}deg)`;
+        avgLbl.style.display  = 'block';
+        avgLbl.textContent    = `Média: ${Math.round(avgMissaoSeg)}s`;
+    } else {
+        pivot.style.display  = 'none';
+        avgLbl.style.display = 'none';
+    }
+
+    // Gradient: arco colorido + tick de média
+    let bg;
+    if (aDeg < 0) {
+        bg = `conic-gradient(${cor} ${cDeg}deg, #edf2f7 0deg)`;
+    } else {
+        const t1 = Math.min(aDeg, cDeg);
+        const t2 = Math.min(aDeg + 3, 360);
+        if (cDeg < aDeg) {
+            bg = `conic-gradient(
+                ${cor}    0deg     ${cDeg}deg,
+                #edf2f7   ${cDeg}deg  ${aDeg}deg,
+                #4a5568   ${aDeg}deg  ${t2}deg,
+                #edf2f7   ${t2}deg    360deg
+            )`;
+        } else {
+            bg = `conic-gradient(
+                ${cor}    0deg     ${aDeg}deg,
+                #4a5568   ${aDeg}deg  ${t2}deg,
+                ${cor}    ${t2}deg    ${cDeg}deg,
+                #edf2f7   ${cDeg}deg  360deg
+            )`;
+        }
+    }
+    document.getElementById('gaugeMissaoRing').style.background = 
+        `conic-gradient(${cor} ${cDeg}deg, #edf2f7 0deg)`;
+}
+
+// ─── Gráfico de linha ────────────────────────────────────────────────
+function renderChart(labels, data) {
+    if (!chartDuracao) {
+        const ctx = document.getElementById('graficoDuracao').getContext('2d');
+        chartDuracao = new Chart(ctx, {
+            type: 'line',
+            data: { labels, datasets: [{
+                label: 'Duração (s)', data,
+                borderColor: '#2b6cb0', backgroundColor: 'rgba(43,108,176,.1)',
+                fill: true, tension: 0.35, pointRadius: 4
+            }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, ticks: { font: { size: 11 } } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    } else {
+        chartDuracao.data.labels = labels;
+        chartDuracao.data.datasets[0].data = data;
+        chartDuracao.update('none');
+    }
+}
+
+// ─── /api/live — lê do LiveState em memória (sem DB) ─────────────────
+async function fetchLive() {
+    try {
+        const json = await fetch('/api/live').then(r => r.json());
+        document.getElementById('horario').textContent = json.agora;
+
+        document.getElementById('badge-a1').className = 'comm-badge ' + (json.comm_a1 ? 'ok' : 'off');
+        document.getElementById('badge-a2').className = 'comm-badge ' + (json.comm_a2 ? 'ok' : 'off');
+
+        const s = json.status, m = json.missao;
+
+        // Modo
+        const modo    = s.modo_producao ? 'PRODUÇÃO' : (s.modo_manutencao ? 'MANUTENÇÃO' : 'PARADO');
+        const modoCls = s.modo_producao ? 'bg-green'  : (s.modo_manutencao ? 'bg-yellow'  : 'bg-gray');
+        const mb = document.getElementById('modo-badge');
+        mb.textContent = modo; mb.className = `badge lg ${modoCls}`;
+
+        // Saúde
+        const ab = document.getElementById('alarme-badge');
+        ab.textContent = s.sem_defeitos ? 'OK' : 'FALHA';
+        ab.className   = `badge lg ${s.sem_defeitos ? 'bg-green' : 'bg-red'}`;
+
+        // Posições
+        document.getElementById('pos-coluna').textContent = s.posicao_translacao ?? '—';
+        document.getElementById('pos-andar').textContent  = s.posicao_elevacao   ?? '—';
+
+        // Missão atual — dados direto da memória do coletor
+        clearInterval(timerAndamento);
+        const elStatus = document.getElementById('m-status');
+        
+        if (m.ativa) {
+            elStatus.textContent = 'Executando';
+            elStatus.className = 'badge bg-green animate-pulse';
+
+            document.getElementById('m-tipo').textContent    = m.tipo    || '-';
+            document.getElementById('m-inicio').textContent  = m.inicio  || '-';
+            document.getElementById('m-origem').textContent  = m.origem  || '-';
+            document.getElementById('m-destino').textContent = m.destino || '-';
+
+            segundosDecorridos = m.duracao_atual || 0;
+            document.getElementById('m-duracao-label').textContent = segundosDecorridos + 's';
+            setGaugeMissao(segundosDecorridos);
+
+            timerAndamento = setInterval(() => {
+                segundosDecorridos++;
+                document.getElementById('m-duracao-label').textContent = segundosDecorridos + 's';
+                setGaugeMissao(segundosDecorridos);
+            }, 1000);
+        } else {
+            elStatus.textContent = 'Parado';
+            elStatus.className = 'badge bg-gray';
+
+            document.getElementById('m-tipo').textContent    = '-';
+            document.getElementById('m-inicio').textContent  = '-';
+            document.getElementById('m-origem').textContent  = '-';
+            document.getElementById('m-destino').textContent = '-';
+            document.getElementById('m-duracao-label').textContent = '0s';
+            document.getElementById('m-duracao-label').style.color = '#d69e2e';
+            setGaugeMissao(0);
+        }
+
+        // KPIs
+        document.getElementById('cc-total').textContent = json.contadores.total    || 0;
+        document.getElementById('cc-ent').textContent   = json.contadores.entradas || 0;
+        document.getElementById('cc-sai').textContent   = json.contadores.saidas   || 0;
+
+    } catch(e) { console.error('fetchLive:', e); }
+}
+
+// ─── /api/oee ────────────────────────────────────────────────────────
+async function fetchOEE() {
+    try {
+        const json = await fetch('/api/oee').then(r => r.json());
+        setGauge('gaugeDispRing', json.disponibilidade, '#38a169');
+        setGauge('gaugePerfRing', json.performance,     '#3182ce');
+        setGauge('gaugeQualRing', json.qualidade,       '#dd6b20');
+        document.getElementById('val-disp').textContent = json.disponibilidade + '%';
+        document.getElementById('val-perf').textContent = json.performance     + '%';
+        document.getElementById('val-qual').textContent = json.qualidade       + '%';
+        document.getElementById('val-oee').textContent  = json.oee             + '%';
+        document.getElementById('oee-titulo').textContent =
+            `OEE — ${json.janela}   |   KPIs de Produção`;
+    } catch(e) { console.error('fetchOEE:', e); }
+}
+
+// ─── /api/missoes ────────────────────────────────────────────────────
+async function fetchMissoes(page = 1) {
+    try {
+        const json = await fetch('/api/missoes?page=' + page).then(r => r.json());
+        currentPage = json.page; totalPages = json.total_pages || 1;
+
+        // Salva média global para o gauge de missão
+        avgMissaoSeg = json.tempo_medio || 0;
+
+        document.getElementById('t-medio').textContent =
+            avgMissaoSeg > 0 ? avgMissaoSeg.toFixed(1) + 's' : '—';
+        document.getElementById('info-pagina').textContent =
+            `Página ${currentPage} de ${totalPages} | ${json.total} missões no total`;
+        document.getElementById('btn-prev').disabled = currentPage <= 1;
+        document.getElementById('btn-next').disabled = currentPage >= totalPages;
+
+        const tbody = document.getElementById('missoes-body');
+        if (!json.historico.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:18px;color:#a0aec0">Nenhuma missão finalizada registrada</td></tr>';
+        } else {
+            tbody.innerHTML = json.historico.map(m => {
+                const rowCls  = m.tipo_missao === 'Carregamento'    ? 'tipo-entrada'
+                              : m.tipo_missao === 'Descarregamento' ? 'tipo-saida' : '';
+                const badge   = m.status_fim === 'OK' ? 'bg-green' : 'bg-red';
+                return `<tr class="${rowCls}">
+                    <td>${m.timestamp_fim}</td>
+                    <td class="td-left">${m.tipo_missao}</td>
+                    <td><strong>${m.origem}</strong></td>
+                    <td><strong>${m.destino}</strong></td>
+                    <td>${m.duracao_segundos.toFixed(1)}</td>
+                    <td><span class="badge ${badge}">${m.status_fim}</span></td>
+                </tr>`;
+            }).join('');
+        }
+
+        const hist = [...json.historico].reverse();
+        renderChart(hist.map(m => m.timestamp_fim), hist.map(m => m.duracao_segundos));
+    } catch(e) { console.error('fetchMissoes:', e); }
+}
+
+function mudarPagina(delta) {
+    fetchMissoes(Math.max(1, Math.min(totalPages, currentPage + delta)));
+}
+
+// ─── Refresh ─────────────────────────────────────────────────────────
+// Carga inicial
+fetchLive();
+fetchMissoes(1);
+fetchOEE();
+
+// Atualizações periódicas
+setInterval(() => {
+    fetchLive();
+}, 1000); // 1 segundo
+
+setInterval(() => {
+    fetchMissoes(currentPage);
+}, 5000); // 5 segundos
+
+setInterval(() => {
+    fetchOEE();
+}, 10000); // 10 segundos
+
+</script>
+</body>
+</html>
